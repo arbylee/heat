@@ -14,9 +14,17 @@
 ENGINE_TOPIC = 'engine'
 
 PARAM_KEYS = (
-    PARAM_TIMEOUT, PARAM_DISABLE_ROLLBACK, PARAM_ADOPT_STACK_DATA
+    PARAM_TIMEOUT, PARAM_DISABLE_ROLLBACK, PARAM_ADOPT_STACK_DATA,
+    PARAM_UPDATE_TYPE,
 ) = (
-    'timeout_mins', 'disable_rollback', 'adopt_stack_data'
+    'timeout_mins', 'disable_rollback', 'adopt_stack_data',
+    'update_type',
+)
+
+STACK_UPDATE_TYPES = (
+    UPDATE_CHECK,
+) = (
+    'check',
 )
 
 STACK_KEYS = (

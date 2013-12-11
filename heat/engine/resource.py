@@ -570,6 +570,27 @@ class Resource(object):
             self.reparse()
             self.state_set(action, self.COMPLETE)
 
+    def check(self):
+        '''
+        Checks that the real world resource is in it's expected state
+
+        Gets the current status of the real world resource and updates the
+        database accordingly.  If check is not supported by the resource,
+        default action is to fail and revert the resource's status to its
+        original state with the added message that check was not performed.
+        '''
+        action = self.UPDATE
+
+        try:
+            self.state_set(action, self.IN_PROGRESS)
+            self.handle_check()
+        except Exception as ex:
+            failure = exception.ResourceFailure(ex, self, action)
+            self.state_set(action, self.FAILED, str(failure))
+            raise failure
+        else:
+            self.state_set(action, self.COMPLETE, "Checked successfully")
+
     def suspend(self):
         '''
         Suspend the resource.  Subclasses should provide a handle_suspend()
@@ -905,6 +926,16 @@ class Resource(object):
                              {'name': str(self), 'msg': ex})
             failure = exception.ResourceFailure(ex, self)
             raise failure
+
+    def handle_check(self):
+        '''
+        Default implementation of handle_check.
+
+        This will fail by default to allow graceful degradation of resources
+        without a check implementation.
+        '''
+        feature = 'Check for "%s"' % self.type()
+        raise exception.NotSupported(feature=feature)
 
     def handle_update(self, json_snippet=None, tmpl_diff=None, prop_diff=None):
         raise UpdateReplace(self.name)

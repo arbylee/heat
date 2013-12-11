@@ -549,8 +549,8 @@ class EngineService(service.Service):
         return dict(stack.identifier())
 
     @request_context
-    def update_stack(self, cnxt, stack_identity, template, params,
-                     files, args):
+    def update_stack(self, cnxt, stack_identity, template=None, params=None,
+                     files=None, args=None):
         """
         The update_stack method updates an existing stack based on the
         provided template and parameters.
@@ -568,7 +568,6 @@ class EngineService(service.Service):
 
         # Get the database representation of the existing stack
         db_stack = self._get_stack(cnxt, stack_identity)
-
         current_stack = parser.Stack.load(cnxt, stack=db_stack)
 
         if current_stack.action == current_stack.SUSPEND:
@@ -586,9 +585,20 @@ class EngineService(service.Service):
             raise exception.RequestLimitExceeded(
                 message=exception.StackResourceLimitExceeded.msg_fmt)
         stack_name = current_stack.name
+
         common_params = api.extract_args(args)
         common_params.setdefault(rpc_api.PARAM_TIMEOUT,
                                  current_stack.timeout_mins)
+        update_type = args.get(rpc_api.PARAM_UPDATE_TYPE)
+        if update_type and update_type not in rpc_api.STACK_UPDATE_TYPES:
+            feat_msg = _('Update type "%s"') % update_type
+            raise exception.NotSupported(feature=feat_msg)
+
+        if update_type == rpc_api.UPDATE_CHECK:
+            # when checking, default to current template
+            template = current_stack.t.t
+            common_params['disable_rollback'] = True
+
         env = environment.Environment(params)
         updated_stack = parser.Stack(cnxt, stack_name, tmpl,
                                      env, **common_params)
@@ -600,7 +610,8 @@ class EngineService(service.Service):
         self.thread_group_mgr.start_with_lock(cnxt, current_stack,
                                               self.engine_id,
                                               current_stack.update,
-                                              updated_stack)
+                                              updated_stack,
+                                              update_type=update_type)
 
         return dict(current_stack.identifier())
 

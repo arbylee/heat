@@ -836,6 +836,59 @@ class StackServiceCreateUpdateDeleteTest(HeatTestCase):
         self.assertTrue(result['stack_id'])
         self.m.VerifyAll()
 
+    @mock.patch.object(parser, 'Stack')
+    def test_stack_update_disables_rollback_when_checking(self, mock_stack):
+        stack_id = tmpl = params = files = {}
+        args = {engine_api.PARAM_UPDATE_TYPE: engine_api.UPDATE_CHECK}
+        self.man._get_stack = mock.Mock()
+        self.man._validate_deferred_auth_context = mock.Mock()
+        self.man.thread_group_mgr.start_with_lock = mock.Mock()
+        self.man.update_stack(self.ctx, stack_id, tmpl, params, files, args)
+
+        kwargs = mock_stack.call_args[1]
+        self.assertTrue(kwargs['disable_rollback'])
+
+    @mock.patch.object(parser, 'Template')
+    @mock.patch.object(parser, 'Stack')
+    def test_stack_update_uses_current_tmpl_when_checking(self, mock_stack,
+                                                          mock_template):
+        stack_id = tmpl = params = files = {}
+        args = {engine_api.PARAM_UPDATE_TYPE: engine_api.UPDATE_CHECK}
+        self.man._get_stack = mock.Mock()
+        self.man._validate_deferred_auth_context = mock.Mock()
+        self.man.thread_group_mgr.start_with_lock = mock.Mock()
+
+        stack = mock.Mock()
+        stack.t.t = 'current'
+        stack.identifier.return_value = {}
+        mock_stack.load.return_value = stack
+        self.man.update_stack(self.ctx, stack_id, tmpl, params, files, args)
+
+        mock_template.assert_called_once_with({}, files=mock.ANY)
+
+    @mock.patch.object(parser, 'Stack')
+    def test_stack_update_starts_update_with_update_type(self, mock_stack):
+        stack_id = tmpl = params = files = {}
+        args = {engine_api.PARAM_UPDATE_TYPE: engine_api.UPDATE_CHECK}
+        self.man._get_stack = mock.Mock()
+        self.man._validate_deferred_auth_context = mock.Mock()
+
+        self.man.thread_group_mgr.start_with_lock = mock.Mock()
+        self.man.update_stack(self.ctx, stack_id, tmpl, params, files, args)
+
+        kwargs = self.man.thread_group_mgr.start_with_lock.call_args[1]
+        self.assertEqual('check', kwargs['update_type'])
+
+    @mock.patch.object(parser, 'Stack')
+    def test_stack_update_not_supported_updates(self, mock_stack):
+        stack_id = tmpl = params = files = {}
+        args = {engine_api.PARAM_UPDATE_TYPE: 'gibberish'}
+        self.man._get_stack = mock.Mock()
+        exc = self.assertRaises(rpc_common.ClientException,
+                                self.man.update_stack,
+                                self.ctx, stack_id, tmpl, params, files, args)
+        self.assertEqual(exc._exc_info[0], exception.NotSupported)
+
     def test_stack_update_equals(self):
         stack_name = 'test_stack_update_equals_resource_limit'
         params = {}
@@ -1555,8 +1608,8 @@ class StackServiceTest(HeatTestCase):
         thread = self.m.CreateMockAnything()
         thread.link(mox.IgnoreArg(), self.stack.id).AndReturn(None)
 
-        def run(stack_id, func, *args):
-            func(*args)
+        def run(stack_id, func, *args, **kwargs):
+            func(*args, **kwargs)
             return thread
         self.eng.thread_group_mgr.start = run
 

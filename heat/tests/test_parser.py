@@ -2375,6 +2375,20 @@ class StackTest(HeatTestCase):
                          self.stack.state)
         self.assertEqual('smelly', self.stack['AResource'].properties['Foo'])
 
+    @mock.patch.object(parser.update, 'StackUpdate')
+    def test_update_with_update_type(self, mock_StackUpdate):
+        env = environment.Environment({})
+        tmpl = template.Template({})
+        self.stack = parser.Stack(self.ctx, 'update_test_stack', tmpl, env)
+
+        self.stack.store()
+        self.stack.create()
+        updated_stack = parser.Stack(self.ctx, 'updated_stack', tmpl, env)
+
+        self.stack.update(updated_stack, update_type='check')
+        kwargs = mock_StackUpdate.call_args[1]
+        self.assertEqual('check', kwargs['update_type'])
+
     def test_stack_create_timeout(self):
         self.m.StubOutWithMock(scheduler.DependencyTaskGroup, '__call__')
         self.m.StubOutWithMock(scheduler, 'wallclock')

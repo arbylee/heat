@@ -737,6 +737,40 @@ class ResourceTest(HeatTestCase):
                          TestResource.resource_to_template(
                              'Test::Resource::resource'))
 
+    def test_check_marks_a_successful_check_as_complete(self):
+        tmpl = {'Type': 'foo'}
+        res = generic_rsrc.ResourceWithProps('test_resource', tmpl, self.stack)
+        res.handle_check = mock.Mock(return_value=True)
+
+        scheduler.TaskRunner(res.check)()
+        self.assertEqual((res.UPDATE, res.COMPLETE), res.state)
+
+    def test_check_marks_the_resource_as_failed_when_exception_is_raised(self):
+        tmpl = {'Type': 'foo'}
+        res = generic_rsrc.ResourceWithProps('test_resource', tmpl, self.stack)
+
+        ex = Exception('fail')
+        res.handle_check = mock.Mock(side_effect=ex)
+
+        self.assertRaises(exception.ResourceFailure,
+                          scheduler.TaskRunner(res.check))
+        self.assertEqual((res.UPDATE, res.FAILED), res.state)
+
+    def test_marks_the_resource_as_in_progress_while_updating(self):
+        tmpl = {'Type': 'foo'}
+        res = generic_rsrc.ResourceWithProps('test_resource', tmpl, self.stack)
+        res.handle_check = mock.Mock(return_value=True)
+        res.state_set = mock.Mock()
+
+        scheduler.TaskRunner(res.check)()
+        mock_state_set_in_progress = mock.call(res.UPDATE, res.IN_PROGRESS)
+        self.assertIn(mock_state_set_in_progress, res.state_set.call_args_list)
+
+    def test_handle_check_default_implementation_raises_not_supported(self):
+        tmpl = {'Type': 'foo'}
+        res = generic_rsrc.ResourceWithProps('test_resource', tmpl, self.stack)
+        self.assertRaises(exception.NotSupported, res.handle_check)
+
 
 class ResourceAdoptTest(HeatTestCase):
     def setUp(self):

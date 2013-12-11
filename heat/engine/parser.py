@@ -526,7 +526,7 @@ class Stack(collections.Mapping):
             post_func=rollback)
         creator(timeout=self.timeout_secs())
 
-    def update(self, newstack):
+    def update(self, newstack, update_type=None):
         '''
         Compare the current stack with newstack,
         and where necessary create/update/delete the resources until
@@ -539,11 +539,12 @@ class Stack(collections.Mapping):
         60 minutes, set in the constructor
         '''
         self.updated_time = datetime.utcnow()
-        updater = scheduler.TaskRunner(self.update_task, newstack)
+        updater = scheduler.TaskRunner(self.update_task, newstack,
+                                       update_type=update_type)
         updater()
 
     @scheduler.wrappertask
-    def update_task(self, newstack, action=UPDATE):
+    def update_task(self, newstack, action=UPDATE, update_type=None):
         if action not in (self.UPDATE, self.ROLLBACK):
             logger.error(_("Unexpected action %s passed to update!") %
                          action)
@@ -551,7 +552,7 @@ class Stack(collections.Mapping):
                            "Invalid action %s" % action)
             return
 
-        if self.status != self.COMPLETE:
+        if self.status != self.COMPLETE and update_type is None:
             if (action == self.ROLLBACK and
                     self.state == (self.UPDATE, self.IN_PROGRESS)):
                 logger.debug(_("Starting update rollback for %s") % self.name)
@@ -567,7 +568,8 @@ class Stack(collections.Mapping):
         backup_stack = self._backup_stack()
         try:
             update_task = update.StackUpdate(self, newstack, backup_stack,
-                                             rollback=action == self.ROLLBACK)
+                                             rollback=action == self.ROLLBACK,
+                                             update_type=update_type)
             updater = scheduler.TaskRunner(update_task)
 
             self.env = newstack.env

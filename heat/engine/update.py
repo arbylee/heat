@@ -14,11 +14,13 @@
 import copy
 
 from heat.db import api as db_api
+from heat.common import exception
 from heat.engine import dependencies
 from heat.engine import resource
 from heat.engine import scheduler
 from heat.openstack.common.gettextutils import _
 from heat.openstack.common import log as logging
+from heat.rpc import api as rpc_api
 
 logger = logging.getLogger(__name__)
 
@@ -29,13 +31,14 @@ class StackUpdate(object):
     """
 
     def __init__(self, existing_stack, new_stack, previous_stack,
-                 rollback=False):
+                 rollback=False, update_type=None):
         """Initialise with the existing stack and the new stack."""
         self.existing_stack = existing_stack
         self.new_stack = new_stack
         self.previous_stack = previous_stack
 
         self.rollback = rollback
+        self.update_type = update_type
 
         self.existing_snippets = dict((n, r.parsed_template())
                                       for n, r in self.existing_stack.items())
@@ -55,19 +58,32 @@ class StackUpdate(object):
             self._remove_backup_resource,
             reverse=True)
 
-        update = scheduler.DependencyTaskGroup(self.dependencies(),
-                                               self._resource_update)
+        update = scheduler.DependencyTaskGroup(
+            self.dependencies(),
+            self._resource_update,
+            aggregate_exceptions=self.aggregate_exceptions)
 
         if not self.rollback:
             yield cleanup_prev()
 
         try:
             yield update()
+        except scheduler.ExceptionGroup as exc:
+            has_failures = lambda e: not isinstance(e, exception.NotSupported)
+            if any(map(has_failures, exc.exceptions)):
+                failures = Exception(str(exc))
+                raise exception.ResourceFailure(failures, {})
         finally:
             self.previous_stack.reset_dependencies()
 
+    @property
+    def aggregate_exceptions(self):
+        return (self.update_type == rpc_api.UPDATE_CHECK)
+
     def _resource_update(self, res):
-        if res.name in self.new_stack and self.new_stack[res.name] is res:
+        if self.update_type == rpc_api.UPDATE_CHECK:
+            return self._check_resource(res)
+        elif res.name in self.new_stack and self.new_stack[res.name] is res:
             return self._process_new_resource_update(res)
         else:
             return self._process_existing_resource_update(res)
@@ -118,6 +134,18 @@ class StackUpdate(object):
 
         self.existing_stack[res_name] = new_res
         yield new_res.create()
+
+    @scheduler.wrappertask
+    def _check_resource(self, res):
+        resource_name = res.name
+
+        if self.existing_stack[resource_name] is not res:
+            return
+
+        msg = _("Checking resource %(resource_name)s for stack %(stack_name)s")
+        logger.info(msg % {'resource_name': resource_name,
+                           'stack_name': self.existing_stack.name})
+        yield res.check()
 
     @scheduler.wrappertask
     def _process_new_resource_update(self, new_res):
