@@ -45,11 +45,13 @@ apt-get update
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o \
   Dpkg::Options::="--force-confold" python-boto python-pip gcc python-dev
+pip install pbr==0.5.21
 pip install heat-cfntools
 cfn-create-aws-symlinks --source /usr/local/bin
 """,
         'fedora': """
 yum install -y python-boto python-pip gcc python-devel
+pip-python install pbr==0.5.21
 pip-python install heat-cfntools
 cfn-create-aws-symlinks
 """,
@@ -59,6 +61,7 @@ then
  rpm -ivh http://mirror.rackspace.com/epel/6/i386/epel-release-6-8.noarch.rpm
 fi
 yum install -y python-boto python-pip gcc python-devel python-argparse
+pip-python install pbr==0.5.21
 pip-python install heat-cfntools
 """,
         'rhel': """
@@ -69,6 +72,7 @@ fi
 # The RPM DB stays locked for a few secs
 while fuser /var/lib/rpm/*; do sleep 1; done
 yum install -y python-boto python-pip gcc python-devel python-argparse
+pip-python install pbr==0.5.21
 pip-python install heat-cfntools
 cfn-create-aws-symlinks
 """,
@@ -80,6 +84,7 @@ apt-get -t wheezy-backports install -y cloud-init
 export DEBIAN_FRONTEND=noninteractive
 apt-get install -y -o Dpkg::Options::="--force-confdef" -o \
   Dpkg::Options::="--force-confold" python-pip gcc python-dev
+pip install pbr==0.5.21
 pip install heat-cfntools
 """}
 
