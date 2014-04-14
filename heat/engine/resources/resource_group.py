@@ -11,6 +11,7 @@
 #    License for the specific language governing permissions and limitations
 #    under the License.
 
+import collections
 import copy
 
 from heat.common import exception
@@ -20,7 +21,6 @@ from heat.engine import parser
 from heat.engine import properties
 from heat.engine import stack_resource
 from heat.openstack.common.gettextutils import _
-
 
 template_template = {
     "heat_template_version": "2013-05-23",
@@ -44,9 +44,9 @@ class ResourceGroup(stack_resource.StackResource):
     """
 
     PROPERTIES = (
-        COUNT, RESOURCE_DEF,
+        COUNT, INDEX_VAR, RESOURCE_DEF,
     ) = (
-        'count', 'resource_def',
+        'count', 'index_var', 'resource_def',
     )
 
     _RESOURCE_DEF_KEYS = (
@@ -70,6 +70,18 @@ class ResourceGroup(stack_resource.StackResource):
                 constraints.Range(min=1),
             ],
             update_allowed=True
+        ),
+        INDEX_VAR: properties.Schema(
+            properties.Schema.STRING,
+            _('A variable that this resource will use to replace with the '
+              'current index of a given resource in the group. Can be used, '
+              'for example, to customize the name property of grouped '
+              'servers in order to differentiate them when listed with '
+              'nova client.'),
+            default="%index%",
+            constraints=[
+                constraints.Length(min=3)
+            ]
         ),
         RESOURCE_DEF: properties.Schema(
             properties.Schema.MAP,
@@ -151,14 +163,34 @@ class ResourceGroup(stack_resource.StackResource):
 
     def _assemble_nested(self, count, include_all=False):
         child_template = copy.deepcopy(template_template)
-        resource_def = self.properties[self.RESOURCE_DEF]
-        if resource_def[self.RESOURCE_DEF_PROPERTIES] is None:
-            resource_def[self.RESOURCE_DEF_PROPERTIES] = {}
+        res_def = self.properties[self.RESOURCE_DEF]
+        if res_def[self.RESOURCE_DEF_PROPERTIES] is None:
+            res_def[self.RESOURCE_DEF_PROPERTIES] = {}
         if not include_all:
-            resource_def_props = resource_def[self.RESOURCE_DEF_PROPERTIES]
+            resource_def_props = res_def[self.RESOURCE_DEF_PROPERTIES]
             clean = dict((k, v) for k, v in resource_def_props.items() if v)
-            resource_def[self.RESOURCE_DEF_PROPERTIES] = clean
-        resources = dict((str(k), resource_def)
+            res_def[self.RESOURCE_DEF_PROPERTIES] = clean
+
+        def handle_repl_val(repl_var, idx, val):
+            recurse = lambda x: handle_repl_val(repl_var, idx, x)
+            if isinstance(val, basestring):
+                return val.replace(repl_var, str(idx))
+            elif isinstance(val, collections.Mapping):
+                return dict(zip(val, map(recurse, val.values())))
+            elif isinstance(val, collections.Sequence):
+                return map(recurse, val)
+            return val
+
+        def do_prop_replace(repl_var, idx, res_def):
+            props = res_def[self.RESOURCE_DEF_PROPERTIES]
+            if props:
+                props = handle_repl_val(repl_var, idx, props)
+                res_def[self.RESOURCE_DEF_PROPERTIES] = props
+            return res_def
+
+        repl_var = self.properties[self.INDEX_VAR]
+        resources = dict((str(k), do_prop_replace(repl_var, k,
+                                                  copy.deepcopy(res_def)))
                          for k in range(count))
         child_template['resources'] = resources
         return child_template
