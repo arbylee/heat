@@ -14,6 +14,7 @@
 import copy
 import uuid
 
+import mock
 import mox
 from neutronclient.v2_0 import client as neutronclient
 
@@ -32,7 +33,6 @@ from heat.openstack.common import uuidutils
 from heat.tests.common import HeatTestCase
 from heat.tests import utils
 from heat.tests.v1_1 import fakes
-
 
 wp_template = '''
 {
@@ -213,6 +213,14 @@ class InstancesTest(HeatTestCase):
 
         self.m.VerifyAll()
 
+    def test_handle_check_raises_exception_if_instance_not_active(self):
+        stack = mock.Mock(id=None)
+        instance = instances.Instance('name', 'json_snippet', stack)
+        instance.nova = mock.Mock()
+        instance._check_active = mock.Mock(return_value=False)
+
+        self.assertRaises(exception.Error, instance.handle_check)
+
     class FakeVolumeAttach:
         def started(self):
             return False
@@ -261,7 +269,7 @@ class InstancesTest(HeatTestCase):
             exception.Error, instance.check_create_complete,
             (return_server, self.FakeVolumeAttach()))
         self.assertEqual(
-            'Creation of server sample-server2 failed: Unknown (500)',
+            'Server sample-server2 failed: Unknown (500)',
             str(e))
 
         self.m.VerifyAll()

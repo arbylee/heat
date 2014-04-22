@@ -512,14 +512,14 @@ class Instance(resource.Resource):
             fault = getattr(server, 'fault', {})
             message = fault.get('message', 'Unknown')
             code = fault.get('code', 500)
-            exc = exception.Error(_("Creation of server %(server)s "
+            exc = exception.Error(_("Server %(server)s "
                                     "failed: %(message)s (%(code)s)") %
                                   dict(server=server.name,
                                        message=message,
                                        code=code))
             raise exc
 
-        exc = exception.Error(_("Creation of server %(server)s failed "
+        exc = exception.Error(_("Server %(server)s failed "
                                 "with unknown status: %(status)s") %
                               dict(server=server.name,
                                    status=server.status))
@@ -542,6 +542,12 @@ class Instance(resource.Resource):
             if iface in new_network_ifaces:
                 new_network_ifaces.remove(iface)
                 old_network_ifaces.remove(iface)
+
+    def handle_check(self):
+        server = self.nova().servers.get(self.resource_id)
+        if not self._check_active(server):
+            raise exception.Error(_("Instance is not ACTIVE (was: %s)") %
+                                  server.status.strip())
 
     def handle_update(self, json_snippet, tmpl_diff, prop_diff):
         if 'Metadata' in tmpl_diff:
