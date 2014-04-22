@@ -74,6 +74,10 @@ class InstantiationData(object):
             msg = _("%(type)s not in valid format: %(error)s") % mdict
             raise exc.HTTPBadRequest(msg)
 
+    @property
+    def ignore_template(self):
+        return (self.update_type() == engine_api.UPDATE_CHECK)
+
     def stack_name(self):
         """
         Return the stack name.
@@ -87,6 +91,9 @@ class InstantiationData(object):
         Get template file contents, either inline or from a URL, in JSON
         or YAML format.
         """
+        if self.ignore_template:
+            return {}
+
         if self.PARAM_TEMPLATE in self.data:
             template_data = self.data[self.PARAM_TEMPLATE]
             if isinstance(template_data, dict):
@@ -133,6 +140,11 @@ class InstantiationData(object):
         """
         params = self.data.items()
         return dict((k, v) for k, v in params if k not in self.PARAMS)
+
+    def update_type(self):
+        update_type = self.data.get(engine_api.PARAM_UPDATE_TYPE) or None
+        if update_type in engine_api.STACK_UPDATE_TYPES:
+            return update_type
 
 
 class StackController(object):

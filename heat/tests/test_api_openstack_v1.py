@@ -160,6 +160,13 @@ blarg: wibble
         data = stacks.InstantiationData(body)
         self.assertRaises(webob.exc.HTTPBadRequest, data.template)
 
+    @mock.patch.object(stacks.InstantiationData, 'ignore_template')
+    def test_template_can_be_ignored(self, mock_ignore):
+        body = {'foo': 'bar'}
+        mock_ignore.__get__ = mock.Mock(return_value=True)
+        data = stacks.InstantiationData(body)
+        self.assertEqual({}, data.template())
+
     def test_parameters(self):
         params = {'foo': 'bar', 'blarg': 'wibble'}
         body = {'parameters': params,
@@ -220,6 +227,30 @@ blarg: wibble
         }
         data = stacks.InstantiationData(body)
         self.assertEqual({'timeout_mins': 60}, data.args())
+
+    def test_ignore_template(self):
+        body = {'update_type': rpc_api.UPDATE_CHECK}
+        data = stacks.InstantiationData(body)
+        self.assertTrue(data.ignore_template)
+
+        body = {'update_type': 'foobar'}
+        data = stacks.InstantiationData(body)
+        self.assertFalse(data.ignore_template)
+
+    def test_update_type_returns_check(self):
+        body = {'update_type': 'check'}
+        data = stacks.InstantiationData(body)
+        self.assertEqual('check', data.update_type())
+
+    def test_update_type_returns_none_if_not_present(self):
+        body = {}
+        data = stacks.InstantiationData(body)
+        self.assertIsNone(data.update_type())
+
+    def test_update_type_returns_none_if_anything_else_is_passed(self):
+        body = {'update_type': 'foo'}
+        data = stacks.InstantiationData(body)
+        self.assertIsNone(data.update_type())
 
 
 class ControllerTest(object):
