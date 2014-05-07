@@ -97,6 +97,10 @@ class ExceptionGroup(Exception):
     def __unicode__(self):
         return unicode(map(unicode, self.exceptions))
 
+    def has_only(self, exc):
+        is_exc_type = lambda e: isinstance(e, exc)
+        return all(map(is_exc_type, self.exceptions))
+
 
 class TaskRunner(object):
     """

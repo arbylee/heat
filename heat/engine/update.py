@@ -68,11 +68,11 @@ class StackUpdate(object):
 
         try:
             yield update()
-        except scheduler.ExceptionGroup as exc:
-            has_failures = lambda e: not isinstance(e, exception.NotSupported)
-            if any(map(has_failures, exc.exceptions)):
-                failures = Exception(str(exc))
-                raise exception.ResourceFailure(failures, {})
+        except scheduler.ExceptionGroup as exc_group:
+            if exc_group.has_only(exception.NotSupported):
+                raise exception.NotSupported(str(exc_group))
+            else:
+                raise exception.ResourceFailure(exc_group, {})
         finally:
             self.previous_stack.reset_dependencies()
 

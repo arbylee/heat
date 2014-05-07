@@ -37,6 +37,7 @@ from heat.engine import update
 from heat.openstack.common.gettextutils import _
 from heat.openstack.common import log as logging
 from heat.openstack.common import strutils
+from heat.rpc import api as rpc_api
 
 logger = logging.getLogger(__name__)
 
@@ -596,6 +597,13 @@ class Stack(collections.Mapping):
         except scheduler.Timeout:
             stack_status = self.FAILED
             reason = 'Timed out'
+        except exception.NotSupported:
+            if update_type == rpc_api.UPDATE_CHECK:
+                stack_status = self.COMPLETE
+                reason = ('Stack successfully updated, '
+                          'but some resources did not support check.')
+            else:
+                raise
         except exception.ResourceFailure as e:
             reason = six.text_type(e)
 

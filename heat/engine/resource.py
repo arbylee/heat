@@ -584,6 +584,9 @@ class Resource(object):
         try:
             self.state_set(action, self.IN_PROGRESS)
             self.handle_check()
+        except exception.NotSupported as ex:
+            self.state_set(action, self.COMPLETE, str(ex))
+            raise
         except Exception as ex:
             failure = exception.ResourceFailure(ex, self, action)
             self.state_set(action, self.FAILED, str(failure))
@@ -934,7 +937,7 @@ class Resource(object):
         This will fail by default to allow graceful degradation of resources
         without a check implementation.
         '''
-        feature = 'Check for "%s"' % self.type()
+        feature = _('Check for "%s"') % self.type()
         raise exception.NotSupported(feature=feature)
 
     def handle_update(self, json_snippet=None, tmpl_diff=None, prop_diff=None):

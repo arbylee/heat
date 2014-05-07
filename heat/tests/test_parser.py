@@ -2389,6 +2389,36 @@ class StackTest(HeatTestCase):
         kwargs = mock_StackUpdate.call_args[1]
         self.assertEqual('check', kwargs['update_type'])
 
+    @mock.patch.object(parser.update, 'StackUpdate')
+    def test_update_with_check_unsupported(self, mock_StackUpdate):
+        env = environment.Environment({})
+        tmpl = template.Template({})
+        self.stack = parser.Stack(self.ctx, 'update_test_stack', tmpl, env)
+
+        self.stack.store()
+        self.stack.create()
+        updated_stack = parser.Stack(self.ctx, 'updated_stack', tmpl, env)
+        not_supported_exc = exception.NotSupported(feature='foo')
+        mock_StackUpdate.return_value.side_effect = not_supported_exc
+
+        self.stack.update(updated_stack, update_type='check')
+        self.assertEqual(self.stack.COMPLETE, self.stack.status)
+
+    @mock.patch.object(parser.update, 'StackUpdate')
+    def test_update_with_other_update_type_unsupported(self, mock_StackUpdate):
+        env = environment.Environment({})
+        tmpl = template.Template({})
+        self.stack = parser.Stack(self.ctx, 'update_test_stack', tmpl, env)
+
+        self.stack.store()
+        self.stack.create()
+        updated_stack = parser.Stack(self.ctx, 'updated_stack', tmpl, env)
+        not_supported_exc = exception.NotSupported(feature='foo')
+        mock_StackUpdate.return_value.side_effect = not_supported_exc
+
+        self.stack.update(updated_stack, update_type='foobar')
+        self.assertEqual(self.stack.FAIL, self.stack.status)
+
     def test_stack_create_timeout(self):
         self.m.StubOutWithMock(scheduler.DependencyTaskGroup, '__call__')
         self.m.StubOutWithMock(scheduler, 'wallclock')
