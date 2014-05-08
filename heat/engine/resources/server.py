@@ -359,9 +359,13 @@ class Server(stack_user.StackUser):
 
         return self.physical_resource_name()
 
-    def _config_drive(self):
+    def _personality(self):
         # This method is overridden by the derived CloudServer resource
-        return self.properties.get(self.CONFIG_DRIVE)
+        return self.properties.get(self.PERSONALITY)
+
+    def _key_name(self):
+        # This method is overridden by the derived CloudServer resource
+        return self.properties.get(self.KEY_NAME)
 
     def _populate_deployments_metadata(self):
         meta = self.metadata_get(True) or {}
@@ -494,10 +498,9 @@ class Server(stack_user.StackUser):
         block_device_mapping = self._build_block_device_mapping(
             self.properties.get(self.BLOCK_DEVICE_MAPPING))
         reservation_id = self.properties.get(self.RESERVATION_ID)
+        config_drive = self.properties.get(self.CONFIG_DRIVE)
         disk_config = self.properties.get(self.DISK_CONFIG)
         admin_pass = self.properties.get(self.ADMIN_PASS) or None
-        personality_files = self.properties.get(self.PERSONALITY)
-        key_name = self.properties.get(self.KEY_NAME)
 
         server = None
         try:
@@ -505,7 +508,7 @@ class Server(stack_user.StackUser):
                 name=self._server_name(),
                 image=image,
                 flavor=flavor_id,
-                key_name=key_name,
+                key_name=self._key_name(),
                 security_groups=security_groups,
                 userdata=userdata,
                 meta=instance_meta,
@@ -514,9 +517,9 @@ class Server(stack_user.StackUser):
                 availability_zone=availability_zone,
                 block_device_mapping=block_device_mapping,
                 reservation_id=reservation_id,
-                config_drive=self._config_drive(),
+                config_drive=config_drive,
                 disk_config=disk_config,
-                files=personality_files,
+                files=self._personality(),
                 admin_pass=admin_pass)
         finally:
             # Avoid a race condition where the thread could be cancelled
@@ -912,7 +915,7 @@ class Server(stack_user.StackUser):
 
         # retrieve provider's absolute limits if it will be needed
         metadata = self.properties.get(self.METADATA)
-        personality = self.properties.get(self.PERSONALITY)
+        personality = self._personality()
         if metadata is not None or personality is not None:
             limits = nova_utils.absolute_limits(self.nova())
 
