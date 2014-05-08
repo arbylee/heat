@@ -473,14 +473,16 @@ class Instance(resource.Resource):
             instance_user = 'ec2-user'
 
         try:
+            user_data = nova_utils.build_userdata(self, userdata,
+                                                   instance_user)
             server = self.nova().servers.create(
                 name=self.physical_resource_name(),
                 image=image_id,
                 flavor=flavor_id,
+                config_drive=bool(user_data and len(user_data.strip())),
                 key_name=self.properties[self.KEY_NAME],
                 security_groups=security_groups,
-                userdata=nova_utils.build_userdata(self, userdata,
-                                                   instance_user),
+                userdata=user_data,
                 meta=self._get_nova_metadata(self.properties),
                 scheduler_hints=scheduler_hints,
                 nics=nics,

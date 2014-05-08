@@ -323,7 +323,6 @@ class CloudLoadBalancer(resource.Resource):
                     ),
                     VIRTUAL_IP_IP_VERSION: properties.Schema(
                         properties.Schema.STRING,
-                        default='IPV6',
                         constraints=[
                             constraints.AllowedValues(['IPV6', 'IPV4']),
                         ]

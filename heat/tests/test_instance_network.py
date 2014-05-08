@@ -201,6 +201,7 @@ class instancesTest(HeatTestCase):
             image=1, flavor=3, key_name='test',
             name=utils.PhysName(stack_name, instance.name),
             security_groups=None,
+            config_drive=bool(len(server_userdata.strip())),
             userdata=server_userdata, scheduler_hints=None, meta=None,
             nics=[{'port-id': '64d913c1-bcb1-42d2-8f0a-9593dbcaf251'}],
             availability_zone=None).AndReturn(
@@ -256,6 +257,7 @@ class instancesTest(HeatTestCase):
             image=1, flavor=3, key_name='test',
             name=utils.PhysName(stack_name, instance.name),
             security_groups=None,
+            config_drive=bool(len(server_userdata.strip())),
             userdata=server_userdata, scheduler_hints=None, meta=None,
             nics=[{'port-id': '64d913c1-bcb1-42d2-8f0a-9593dbcaf251'}],
             availability_zone=None).AndReturn(

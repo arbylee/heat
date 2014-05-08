@@ -129,6 +129,7 @@ class InstancesTest(HeatTestCase):
                     limit=instance.physical_resource_name_limit),
                 security_groups=None,
                 userdata=mox.IgnoreArg(),
+                config_drive=mox.IgnoreArg(),
                 scheduler_hints={'foo': ['spam', 'ham', 'baz'], 'bar': 'eggs'},
                 meta=None, nics=None, availability_zone=None).AndReturn(
                     return_server)

@@ -229,6 +229,7 @@ def setup_mocks(mocks, stack, mock_image_constraint=True):
     fc.servers.create(image=744, flavor=3, key_name='test',
                       name=utils.PhysName(stack.name, 'WebServer'),
                       security_groups=None,
+                      config_drive=bool(len(server_userdata.strip())),
                       userdata=server_userdata, scheduler_hints=None,
                       meta=None, nics=None,
                       availability_zone=None).AndReturn(

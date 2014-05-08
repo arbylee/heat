@@ -171,6 +171,7 @@ class ServerTagsTest(HeatTestCase):
         self.m.StubOutWithMock(self.fc.servers, 'create')
         self.fc.servers.create(
             image=1, flavor=1, key_name='test',
+            config_drive=True,
             name=utils.PhysName(stack_name, instance.name),
             security_groups=None,
             userdata=server_userdata, scheduler_hints=None,
@@ -253,6 +254,7 @@ class ServerTagsTest(HeatTestCase):
             image=1, flavor=1, key_name='test',
             name=mox.IgnoreArg(),
             security_groups=None,
+            config_drive=mox.IgnoreArg(),
             userdata=mox.IgnoreArg(), scheduler_hints=None,
             meta=nova_tags, nics=None, availability_zone=None).AndReturn(
                 self.fc.servers.list()[1])
@@ -303,6 +305,7 @@ class ServerTagsTest(HeatTestCase):
         self.fc.servers.create(
             image=1, flavor=1, key_name='test',
             name=mox.IgnoreArg(),
+            config_drive=mox.IgnoreArg(),
             security_groups=None,
             userdata=mox.IgnoreArg(), scheduler_hints=None,
             meta=nova_tags, nics=None, availability_zone=None).AndReturn(
