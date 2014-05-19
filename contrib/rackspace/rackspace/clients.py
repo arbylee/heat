@@ -52,35 +52,69 @@ class Clients(clients.OpenStackClients):
     def __init__(self, context):
         super(Clients, self).__init__(context)
         self.pyrax = None
+        self._networks = None
+        self._dns = None
+        self._autoscale = None
+        self._lb = None
 
     def _get_client(self, name):
         if not self.pyrax:
             self.__authenticate()
-        return self.pyrax.get(name)
+        # try and get an end point internal to the DC for faster communication
+        try:
+            return self.pyrax.get_client(name, cfg.CONF.region_name,
+                                         public=False)
+        # otherwise use the default public one
+        except (pyrax.exceptions.NoEndpointForService,
+                pyrax.exceptions.NoSuchClient):
+            LOG.warn(_("Could not find private client for %s. "
+                       "Trying public client."), name)
+            return self.pyrax.get_client(name, cfg.CONF.region_name)
 
     def auto_scale(self):
         """Rackspace Auto Scale client."""
-        return self._get_client("autoscale")
-
-    def cloud_db(self):
-        """Rackspace cloud database client."""
-        return self._get_client("database")
+        if not self._autoscale:
+            self._autoscale = self._get_client("autoscale")
+        return self._autoscale
 
     def cloud_lb(self):
         """Rackspace cloud loadbalancer client."""
-        return self._get_client("load_balancer")
+        if not self._lb:
+            self._lb = self._get_client("load_balancer")
+        return self._lb
 
     def cloud_dns(self):
         """Rackspace cloud dns client."""
-        return self._get_client("dns")
+        if not self._dns:
+            self._dns = self._get_client("dns")
+        return self._dns
 
-    def nova(self):
-        """Rackspace cloudservers client."""
-        return self._get_client("compute")
+    def nova(self, service_type="compute"):
+        """Rackspace cloudservers client.
+
+        Specifying the service type is to
+        maintain compatibility with clients.OpenStackClients. It is not
+        actually a valid option to change within pyrax.
+        """
+        if not self._nova:
+            self._nova = self._get_client("compute")
+        return self._nova
 
     def cloud_networks(self):
         """Rackspace cloud networks client."""
-        return self._get_client("network")
+        if not self._networks:
+            if not self.pyrax:
+                self.__authenticate()
+            # need special handling now since the contextual
+            # pyrax doesn't handle "networks" not being in
+            # the catalog
+            ep = pyrax._get_service_endpoint(self.pyrax, "compute",
+                                             region=cfg.CONF.region_name)
+            cls = pyrax._client_classes['compute:network']
+            self._networks = cls(self.pyrax,
+                                 region_name=cfg.CONF.region_name,
+                                 management_url=ep)
+        return self._networks
 
     def trove(self):
         """Rackspace trove client."""
@@ -100,16 +134,28 @@ class Clients(clients.OpenStackClients):
             self._cinder.client.management_url = management_url
         return self._cinder
 
+    def swift(self):
+        # Rackspace doesn't include object-store in the default catalog
+        # for "reasons". The pyrax client takes care of this, but it
+        # returns a wrapper over the upstream python-swiftclient so we
+        # unwrap here and things just work
+        if not self._swift:
+            self._swift = self._get_client("object_store").connection
+        return self._swift
+
     def __authenticate(self):
-        pyrax.set_setting("identity_type", "keystone")
-        pyrax.set_setting("auth_endpoint", self.context.auth_url)
-        LOG.info(_("Authenticating username:%s") % self.context.username)
-        self.pyrax = pyrax.auth_with_token(self.context.auth_token,
-                                           tenant_id=self.context.tenant_id,
-                                           tenant_name=self.context.tenant,
-                                           region=(cfg.CONF.region_name
-                                                   or None))
-        if not self.pyrax:
-            raise exception.AuthorizationFailure("No services available.")
-        LOG.info(_("User %s authenticated successfully.")
-                 % self.context.username)
+        """Create an authenticated client context."""
+        self.pyrax = pyrax.create_context("rackspace")
+        self.pyrax.auth_endpoint = self.context.auth_url
+        LOG.info(_("Authenticating username: %s") %
+                 self.context.username)
+        tenant = self.context.tenant_id
+        tenant_name = self.context.tenant
+        self.pyrax.auth_with_token(self.context.auth_token,
+                                   tenant_id=tenant,
+                                   tenant_name=tenant_name)
+        if not self.pyrax.authenticated:
+            LOG.warn(_("Pyrax Authentication Failed."))
+            raise exception.AuthorizationFailure()
+        LOG.info(_("User %s authenticated successfully."),
+                 self.context.username)
