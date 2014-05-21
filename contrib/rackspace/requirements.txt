@@ -1,1 +1,2 @@
 pyrax>=1.8.1
+paramiko>=1.9.0
