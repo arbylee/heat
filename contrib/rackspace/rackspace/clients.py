@@ -13,6 +13,8 @@
 
 """Client Libraries for Rackspace Resources."""
 
+import urlparse
+
 from oslo.config import cfg
 
 from heat.common import exception
@@ -20,23 +22,14 @@ from heat.engine import clients
 from heat.openstack.common.gettextutils import _
 from heat.openstack.common import log as logging
 
+from glanceclient import client as glanceclient
+
 LOG = logging.getLogger(__name__)
 
 try:
     import pyrax
 except ImportError:
     LOG.info(_('pyrax not available'))
-
-try:
-    from swiftclient import client as swiftclient
-except ImportError:
-    swiftclient = None
-    LOG.info(_('swiftclient not available'))
-try:
-    from ceilometerclient import client as ceilometerclient
-except ImportError:
-    ceilometerclient = None
-    LOG.info(_('ceilometerclient not available'))
 
 cloud_opts = [
     cfg.StrOpt('region_name',
@@ -142,6 +135,33 @@ class Clients(clients.OpenStackClients):
         if not self._swift:
             self._swift = self._get_client("object_store").connection
         return self._swift
+
+    def glance(self):
+        if not self._glance:
+            con = self.context
+            endpoint_type = self._get_client_option('glance', 'endpoint_type')
+            endpoint = self.url_for(service_type='image',
+                                    endpoint_type=endpoint_type,
+                                    region_name=cfg.CONF.region_name)
+            # Rackspace service catalog includes a tenant scoped glance
+            # endpoint so we have to munge the url a bit
+            glance_url = urlparse.urlparse(endpoint)
+            # remove the tenant and following from the url
+            endpoint = "%s://%s" % (glance_url.scheme, glance_url.hostname)
+            args = {
+                'auth_url': con.auth_url,
+                'service_type': 'image',
+                'project_id': con.tenant,
+                'token': self.auth_token,
+                'endpoint_type': endpoint_type,
+                'ca_file': self._get_client_option('glance', 'ca_file'),
+                'cert_file': self._get_client_option('glance', 'cert_file'),
+                'key_file': self._get_client_option('glance', 'key_file'),
+                'insecure': self._get_client_option('glance', 'insecure')
+            }
+
+            self._glance = glanceclient.Client('2', endpoint, **args)
+        return self._glance
 
     def __authenticate(self):
         """Create an authenticated client context."""
