@@ -149,12 +149,28 @@ class ChefScripts(RemoteCommands):
         package "git"
 
         ENV["USE_SYSTEM_GECODE"] = "1"
-
+        gem_package "buff-extensions" do
+            version "0.3"
+            gem_binary("%s")
+        end
+        gem_package "varia_model" do
+            version "0.1"
+            gem_binary("%s")
+        end
+        gem_package "ridley" do
+            version "1.5.3"
+            gem_binary("%s")
+        end
         gem_package "%s" do
           gem_binary("%s")
           version "%s"
-        end""" % (self._update_package_manager(), installer,
-                  os.path.join(gem_path, 'gem'), version)
+        end""" % (self._update_package_manager(),
+                  os.path.join(gem_path, 'gem'),
+                  os.path.join(gem_path, 'gem'),
+                  os.path.join(gem_path, 'gem'),
+                  installer,
+                  os.path.join(gem_path, 'gem'),
+                  version)
         self.run_recipe('installer_dependencies', script, kitchen_path,
                         cookbook_path, gem_path=gem_path)
 
