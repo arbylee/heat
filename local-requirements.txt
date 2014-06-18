@@ -1,3 +1,3 @@
--e git://github.rackspace.com/andr5956/impacket.git#egg=impacket
+#-e git://github.rackspace.com/andr5956/impacket.git#egg=impacket
 -e git://github.com/rackspace/pyrax.git@4441a5bf900f19fdb2304a0f9ed15b43151541d8#egg=pyrax
 MySQL-python
